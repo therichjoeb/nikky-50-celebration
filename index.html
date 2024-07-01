@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search by Code</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #444;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .box {
+            width: 90%;
+            max-width: 600px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .box h2 {
+            margin-bottom: 20px;
+            color: #555;
+        }
+        input, button {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 15px;
+            font-size: 16px;
+            color: #333;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        input:focus, button:hover {
+            background-color: #f1f1f1;
+            border-color: #bbb;
+        }
+        button {
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #result {
+            margin-top: 20px;
+            font-weight: bold;
+            text-align: center;
+            color: #d9534f;
+        }
+        table {
+            width: 90%;
+            max-width: 600px;
+            margin: 20px auto;
+            border-collapse: collapse;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 15px;
+            text-align: center;
+        }
+        th {
+            background-color: #f7f7f7;
+            color: #333;
+        }
+        .strikeout {
+            text-decoration: line-through;
+            color: red;
+        }
+        .highlight {
+            background-color: #ffff99;
+        }
+        #confirmedCounter {
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+            color: #5cb85c;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.9/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h1>Search by Code</h1>
+    <div class="container">
+        <div class="box">
+            <h2>Search for Code</h2>
+            <input type="text" id="searchCode" placeholder="Enter unique code" />
+            <button onclick="searchCode()">Search</button>
+            <div id="result"></div>
+        </div>
+    </div>
+
+    <div id="confirmedCounter">Confirmed Codes: 0</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Serial</th>
+                <th>Code</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="codeList">
+            <!-- Entries will be dynamically added here -->
+        </tbody>
+    </table>
+
+    <button onclick="exportToExcel()">Export to Excel</button>
+
+    <script>
+        let entries = JSON.parse(localStorage.getItem('entries')) || [];
+
+        function generateUniqueCode() {
+            const abbreviation = 'NS50';
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const specialChars = '!@#$%^&*';
+            const letter = letters.charAt(Math.floor(Math.random() * letters.length));
+            const digits = Math.floor(Math.random() * 90 + 10); // Generates a number between 10 and 99
+            const specialChar = specialChars.charAt(Math.floor(Math.random() * specialChars.length));
+            return `${abbreviation}${letter}${digits}${specialChar}`;
+        }
+
+        function generateCodes() {
+            while (entries.length < 250) {
+                const newCode = generateUniqueCode();
+                if (!entries.some(entry => entry.code === newCode)) {
+                    entries.push({ code: newCode, confirmed: false });
+                }
+            }
+            updateTable();
+        }
+
+        function updateTable() {
+            const codeList = document.getElementById('codeList');
+            codeList.innerHTML = '';
+            let confirmedCount = 0;
+            entries.forEach((entry, index) => {
+                if (entry.confirmed) {
+                    confirmedCount++;
+                }
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td id="code-${entry.code}" class="${entry.confirmed ? 'strikeout' : ''}">${entry.code}</td>
+                    <td>
+                        <button onclick="confirmOrUnconfirmCode('${entry.code}')">${entry.confirmed ? 'Unconfirm' : 'Confirm'}</button>
+                        <button onclick="confirmDelete('${entry.code}')">Delete</button>
+                    </td>
+                `;
+                codeList.appendChild(row);
+            });
+            localStorage.setItem('entries', JSON.stringify(entries));
+            document.getElementById('confirmedCounter').textContent = `Confirmed Codes: ${confirmedCount}`;
+        }
+
+        function searchCode() {
+            const searchCode = document.getElementById('searchCode').value.trim().toUpperCase();
+            const resultDiv = document.getElementById('result');
+            const entry = entries.find(entry => entry.code === searchCode);
+
+            if (entry) {
+                resultDiv.innerHTML = `Code: ${entry.code} <button onclick="confirmOrUnconfirmCode('${entry.code}')">${entry.confirmed ? 'Unconfirm' : 'Confirm'}</button>`;
+                highlightAndScrollTo(entry.code);
+            } else {
+                resultDiv.textContent = 'No entry found for the provided code.';
+            }
+        }
+
+        function confirmOrUnconfirmCode(code) {
+            const entry = entries.find(entry => entry.code === code);
+            if (entry) {
+                entry.confirmed = !entry.confirmed;
+                updateTable();
+                highlightAndScrollTo(entry.code);
+                document.getElementById('result').textContent = `Code ${entry.confirmed ? 'confirmed' : 'unconfirmed'} and ${entry.confirmed ? 'struck out' : 'restored'} in the table.`;
+            }
+        }
+
+        function confirmDelete(code) {
+            if (confirm('Are you sure you want to delete this code?')) {
+                deleteEntry(code);
+            }
+        }
+
+        function deleteEntry(code) {
+            entries = entries.filter(entry => entry.code !== code);
+            updateTable();
+        }
+
+        function exportToExcel() {
+            const worksheet = XLSX.utils.json_to_sheet(entries);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Entries');
+            XLSX.writeFile(workbook, 'entries.xlsx');
+        }
+
+        function highlightAndScrollTo(code) {
+            const element = document.getElementById(`code-${code}`);
+            if (element) {
+                element.classList.add('highlight');
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => {
+                    element.classList.remove('highlight');
+                }, 2000);
+            }
+        }
+
+        // Initial generation of 250 codes if not already present in localStorage
+        if (entries.length === 0) {
+            generateCodes();
+        } else {
+            updateTable();
+        }
+    </script>
+</body>
+</html>
